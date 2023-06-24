@@ -1,52 +1,64 @@
-import dask.dataframe as dd
+import numpy as np
 from dask_ml.feature_extraction.text import HashingVectorizer
-from dask_ml.linear_model import LogisticRegression
+from sklearn.linear_model import SGDClassifier
+from dask_ml.wrappers import Incremental
 from dask.distributed import Client
 from nltk.corpus import stopwords
 from dask_ml.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 import nltk
+from sklearn.preprocessing import LabelEncoder
 from Database.db_connector import load_data_from_mongodb
 
-nltk.download('stopwords')
+if __name__ == '__main__':
 
-# Connect to Dask client
-client = Client()
+    nltk.download('stopwords', quiet=True)
 
-try:
-    # Load data from MongoDB
-    df = load_data_from_mongodb()
+    # Connect to Dask client
+    client = Client()
 
-    # Convert pandas dataframe to dask dataframe
-    ddf = dd.from_pandas(df, npartitions=2)
+    try:
+        # Load data from MongoDB
+        df = load_data_from_mongodb()
 
-    # Define features and target
-    X = ddf['Positive_Review'].str.lower().str.replace('[^\w\s]', '').to_frame()
-    y = (ddf['Reviewer_Score'] > 5).to_frame()  # Let's say a score > 5 is positive sentiment
+        # Convert 'Positive_Review' and 'Negative_Review' to lists of strings
+        df['Positive_Review'] = df['Positive_Review'].astype(str)
+        df['Negative_Review'] = df['Negative_Review'].astype(str)
 
-    # Split the data into training and test sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        # Define X and y
+        X = df['Positive_Review'] + df['Negative_Review']
+        y = df['Reviewer_Score']
 
-    # Initialize a vectorizer
-    vectorizer = HashingVectorizer(stop_words=stopwords.words('english'))
+        # Split the data into training and test sets
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Vectorize the text reviews
-    X_train = vectorizer.fit_transform(X_train.values.compute())
-    X_test = vectorizer.transform(X_test.values.compute())
+        # Convert X_train and X_test to lists of strings
+        X_train = X_train.astype(str).tolist()
+        X_test = X_test.astype(str).tolist()
 
-    # Initialize a logistic regression model
-    model = LogisticRegression()
+        # Initialize a vectorizer
+        vectorizer = HashingVectorizer(stop_words=stopwords.words('english'))
 
-    # Fit the model
-    model.fit(X_train, y_train.values.compute())
+        X_train = vectorizer.fit_transform(X_train)
+        X_test = vectorizer.transform(X_test)
 
-    # Predict the test set results
-    y_pred = model.predict(X_test)
+        # Create a scikit-learn SGDClassifier model
+        sgd = SGDClassifier()
 
-    # Calculate the accuracy of the model
-    accuracy = accuracy_score(y_test.values.compute(), y_pred)
+        # Wrap the model with Dask Incremental
+        model = Incremental(sgd)
 
-    print(f'Accuracy: {accuracy}')
-    client.close()
-finally:
-    client.close()
+        le = LabelEncoder()
+        y_train_encoded = le.fit_transform(y_train)
+
+        model.fit(X_train, y_train_encoded, classes=np.unique(y_train_encoded))
+
+        # Predict the test data
+        y_pred = model.predict(X_test)
+
+        y_test_encoded = le.transform(y_test)
+        print(accuracy_score(y_test_encoded, y_pred))
+
+        client.close()
+    finally:
+        client.close()
