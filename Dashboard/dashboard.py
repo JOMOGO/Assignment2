@@ -1,11 +1,9 @@
 import dash
 from dash import dcc, html, Input, Output, State
-from pymongo import MongoClient
 import plotly.express as px
 from plotly.graph_objs import Box
 import dash_bootstrap_components as dbc
 from keras.models import load_model
-from keras.preprocessing.text import Tokenizer
 from keras.utils import pad_sequences
 import numpy as np
 import joblib

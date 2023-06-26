@@ -1,97 +1,72 @@
 import numpy as np
 import pandas as pd
 from dask_ml.feature_extraction.text import HashingVectorizer
-from sklearn.linear_model import SGDClassifier, LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from dask_ml.wrappers import Incremental
 from dask.distributed import Client
 from nltk.corpus import stopwords
 from dask_ml.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report
-import joblib
-import os
+from imblearn.over_sampling import RandomOverSampler
 from sklearn.preprocessing import LabelEncoder
 from Database.db_connector import load_data_from_mongodb
-from sklearn.model_selection import GridSearchCV
 from keras.preprocessing.text import Tokenizer
 from keras.utils import pad_sequences
 from keras.models import Sequential
 from keras.layers import Dense, Embedding, LSTM, Conv1D, GlobalMaxPooling1D, Bidirectional
 from keras.utils.np_utils import to_categorical
+import joblib
 
-# Create a list of models to evaluate
-# models = [
-#     {"name": "SGDClassifier", "model": SGDClassifier()},
-#     {"name": "LogisticRegression", "model": LogisticRegression()}
-# ]
+def select_review(row):
+    if row['Reviewer_Score'] > 6:
+        return row['Positive_Review']
+    elif row['Reviewer_Score'] < 4:
+        return row['Negative_Review']
+    else:
+        return np.nan
 
 if __name__ == '__main__':
-    # Connect to Dask client
     client = Client()
 
     try:
-        # Load data from MongoDB
         df = load_data_from_mongodb()
 
-        # Convert 'Positive_Review' and 'Negative_Review' to lists of strings
         df['Positive_Review'] = df['Positive_Review'].astype(str)
         df['Negative_Review'] = df['Negative_Review'].astype(str)
 
-        # Define X and y
-        X = df['Positive_Review'] + df['Negative_Review']
-        df['Sentiment'] = df['Reviewer_Score'].apply(lambda x: 'positive' if x > 5 else 'negative')
+        df['Review'] = df.apply(select_review, axis=1)
+        df = df.dropna(subset=['Review'])
+
+        df['Sentiment'] = df['Reviewer_Score'].apply(lambda x: 'positive' if x > 6 else ('negative' if x < 4 else np.nan))
+        df = df.dropna(subset=['Sentiment'])
+
+        X = df['Review']
         y = df['Sentiment']
 
-        # Convert X and y to list
         X = X.astype(str).tolist()
         y = y.tolist()
 
-        # Tokenizing text
         tokenizer = Tokenizer(num_words=2000)
         tokenizer.fit_on_texts(X)
         joblib.dump(tokenizer, '../Model_results/tokenizer.pkl')
 
-        # Split the data into training and test sets
+        ros = RandomOverSampler(random_state=42)
+
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        # Padding sequences
         X_train_seq = pad_sequences(tokenizer.texts_to_sequences(X_train), maxlen=300)
         X_test_seq = pad_sequences(tokenizer.texts_to_sequences(X_test), maxlen=300)
 
-        # Initialize a vectorizer
+        X_resampled, y_resampled = ros.fit_resample(pd.DataFrame(X_train_seq), y_train)
+
+        X_resampled = [str(doc) for doc in X_resampled[0]]  # Convert X_resampled to a list of strings
+        y_resampled = pd.Series(y_resampled)  # Transform resampled y into a pandas Series
+
         vectorizer = HashingVectorizer(stop_words=stopwords.words('english'))
-        X_train = vectorizer.fit_transform(X_train)
+        X_train_transformed = vectorizer.fit_transform(X_resampled)
         joblib.dump(vectorizer, '../Model_results/vectorizer.pkl')
-        X_test = vectorizer.transform(X_test)
+        X_test_transformed = vectorizer.transform(X_test)
 
         le = LabelEncoder()
-        y_train_encoded = le.fit_transform(y_train)
+        y_train_encoded = le.fit_transform(y_resampled)
         y_test_encoded = le.transform(y_test)
-
-        # for m in models:
-        #     model_file = f"../Model_results/{m['name']}_model.pkl"
-        #     if os.path.exists(model_file):
-        #         print(f"Loading {m['name']} from disk...")
-        #         model = joblib.load(model_file)
-        #     else:
-        #         print(f"Training {m['name']}...")
-        #         if hasattr(m['model'], 'partial_fit'):
-        #             model = Incremental(m['model'])
-        #             model.fit(X_train, y_train_encoded, classes=np.unique(y_train_encoded))
-        #         else:
-        #             model = m['model']
-        #             model.fit(X_train.toarray(), y_train_encoded)  # Convert to dense array
-        #         joblib.dump(model, model_file)
-        #
-        #     # Predict the test data
-        #     if hasattr(m['model'], 'partial_fit'):
-        #         y_pred = model.predict(X_test)
-        #     else:
-        #         y_pred = model.predict(X_test.toarray())  # Convert to dense array
-        #
-        #     print(f"Accuracy of {m['name']}: ", accuracy_score(y_test_encoded, y_pred))
-        #     print(f"Classification report of {m['name']}:")
-        #     print(classification_report(y_test_encoded, y_pred, zero_division=1))
 
         # Convert target variable to categorical
         y_train_cat = to_categorical(y_train_encoded)
@@ -154,7 +129,6 @@ if __name__ == '__main__':
         # Evaluate the Bi-LSTM model
         scores = model_bilstm.evaluate(X_test_seq, y_test_cat)
         print("Bi-LSTM Accuracy: ", scores[1])
-
 
         client.close()
     finally:
