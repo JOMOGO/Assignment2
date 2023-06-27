@@ -11,4 +11,4 @@ def load_data_from_mongodb():
     data = list(collection.find())
     df = pd.DataFrame(data)
 
-    return df
+    return df, collection

@@ -26,7 +26,7 @@ if __name__ == '__main__':
     client = Client()
 
     try:
-        df = load_data_from_mongodb()
+        df, collection = load_data_from_mongodb()
 
         df['Positive_Review'] = df['Positive_Review'].astype(str)
         df['Negative_Review'] = df['Negative_Review'].astype(str)

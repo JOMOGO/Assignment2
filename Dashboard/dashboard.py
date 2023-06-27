@@ -1,5 +1,5 @@
 import dash
-from dash import dcc, html, Input, Output, State
+from dash import dcc, html, Input, Output, State, dash_table
 import plotly.express as px
 from plotly.graph_objs import Box
 import dash_bootstrap_components as dbc
@@ -9,7 +9,7 @@ import numpy as np
 import joblib
 from Database.db_connector import load_data_from_mongodb
 
-df = load_data_from_mongodb()
+df, collection= load_data_from_mongodb()
 
 # Create a Dash app
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -65,7 +65,23 @@ app.layout = dbc.Container([
                     dbc.Col([
                         dcc.Input(id='user-input', type='text', placeholder='Type a review...'),
                         html.Button('Predict', id='predict-button', n_clicks=0),
-                        html.Div(id='prediction-result')
+                        html.Div(id='prediction-result'),
+                        html.Br(),  # To add space
+                        html.Label("Model Predictions:"),
+                        dash_table.DataTable(
+                            id='table',
+                            columns=[
+                                {"name": "Model", "id": "model"},
+                                {"name": "Prediction", "id": "prediction"},
+                                {"name": "Certainty (%)", "id": "certainty"}
+                            ],
+                            data=[],
+                            style_cell={
+                                'textAlign': 'left',
+                                'whiteSpace': 'normal',
+                                'height': 'auto',
+                            },
+                        )
                     ])
                 ])
             ])
@@ -107,7 +123,8 @@ def update_plots(clickData):
     return box_plot, bar_chart
 
 @app.callback(
-    Output('prediction-result', 'children'),
+    [Output('prediction-result', 'children'),
+     Output('table', 'data')],
     [Input('predict-button', 'n_clicks')],
     [State('user-input', 'value')]
 )
@@ -129,26 +146,29 @@ def update_output(n_clicks, value):
         cnn_sentiment = 'positive' if np.argmax(cnn_pred) else 'negative'
         bilstm_sentiment = 'positive' if np.argmax(bilstm_pred) else 'negative'
 
+        # Compute prediction certainty (maximum probability)
+        rnn_certainty = np.max(rnn_pred) * 100
+        cnn_certainty = np.max(cnn_pred) * 100
+        bilstm_certainty = np.max(bilstm_pred) * 100
+
         # Create response
         response = f'RNN Model Prediction: {rnn_sentiment}, CNN Model Prediction: {cnn_sentiment}, Bi-LSTM Model Prediction: {bilstm_sentiment}'
 
-        return response
+        # Create table data
+        table_data = [
+            {"model": "RNN", "prediction": rnn_sentiment, "certainty": f"{rnn_certainty:.2f}%"},
+            {"model": "CNN", "prediction": cnn_sentiment, "certainty": f"{cnn_certainty:.2f}%"},
+            {"model": "Bi-LSTM", "prediction": bilstm_sentiment, "certainty": f"{bilstm_certainty:.2f}%"},
+        ]
 
-negative_reviews = ["The service was terrible!", "I hated the food, it was so bad!", "This was the worst hotel I've ever stayed at!"]
+        # Compute the overall sentiment (mode of all predictions)
+        overall_sentiment = max(set([rnn_sentiment, cnn_sentiment, bilstm_sentiment]), key=[rnn_sentiment, cnn_sentiment, bilstm_sentiment].count)
+        overall_certainty = (rnn_certainty + cnn_certainty + bilstm_certainty) / 3
+        table_data.append({"model": "Overall", "prediction": overall_sentiment, "certainty": f"{overall_certainty:.2f}%"})
 
-for review in negative_reviews:
-    sequences = tokenizer.texts_to_sequences([review])
-    data = pad_sequences(sequences, maxlen=MAX_LEN)
-    rnn_pred = rnn_model.predict(data)[0]
-    cnn_pred = cnn_model.predict(data)[0]
-    bilstm_pred = bilstm_model.predict(data)[0]
+        return response, table_data
+    else:
+        return dash.no_update, dash.no_update
 
-    rnn_sentiment = 'positive' if np.argmax(rnn_pred) else 'negative'
-    cnn_sentiment = 'positive' if np.argmax(cnn_pred) else 'negative'
-    bilstm_sentiment = 'positive' if np.argmax(bilstm_pred) else 'negative'
-
-    print(f"Review: {review}")
-    print(f"RNN Prediction: {rnn_sentiment}, CNN Prediction: {cnn_sentiment}, Bi-LSTM Prediction: {bilstm_sentiment}")
-    
 if __name__ == '__main__':
     app.run_server(debug=True)
