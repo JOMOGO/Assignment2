@@ -18,6 +18,7 @@ from sklearn.metrics import confusion_matrix, roc_curve, auc
 import plotly.figure_factory as ff
 import plotly.graph_objs as go
 import plotly.io as pio
+import re
 
 def select_review(row):
     if row['Reviewer_Score'] > 6:
@@ -42,6 +43,7 @@ def plot_confusion_matrix(y_true, y_pred, labels):
 
     return fig
 
+
 def plot_roc_auc(y_true, y_pred, model_name):
     fpr, tpr, _ = roc_curve(y_true.ravel(), y_pred.ravel())
     roc_auc = auc(fpr, tpr)
@@ -57,8 +59,10 @@ def plot_roc_auc(y_true, y_pred, model_name):
 
     return fig
 
-def map_select_review(df):
-    return df.apply(select_review, axis=1)
+def select_review(row):
+    text = row['Positive_Review'] if row['Reviewer_Score'] > 6 else row['Negative_Review']
+    processed_text = re.sub(r'\b(not|no|never|don\'t)\s+(\w+)\b', r'\1_\2', text)  # Add a prefix 'not_' to the word after negation terms
+    return processed_text
 
 def map_sentiment(df):
     return df['Reviewer_Score'].apply(lambda x: 'positive' if x > 6 else ('negative' if x < 4 else np.nan))
