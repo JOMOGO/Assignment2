@@ -8,6 +8,7 @@ from keras.utils import pad_sequences
 import numpy as np
 import joblib
 from Database.db_connector import load_data_from_mongodb
+import plotly.io as pio
 
 df, collection= load_data_from_mongodb()
 
@@ -29,6 +30,19 @@ bilstm_model = load_model('../Model_results/bilstm_model.h5')
 # Load tokenizer and vectorizer
 tokenizer = joblib.load('../Model_results/tokenizer.pkl')
 vectorizer = joblib.load('../Model_results/vectorizer.pkl')
+
+# Load plots
+cm_fig_rnn = pio.read_json('../Model_results/cm_fig_rnn.json')
+roc_fig_rnn = pio.read_json('../Model_results/roc_fig_rnn.json')
+lp_fig_rnn = pio.read_json('../Model_results/lp_fig_rnn.json')
+
+cm_fig_cnn = pio.read_json('../Model_results/cm_fig_cnn.json')
+roc_fig_cnn = pio.read_json('../Model_results/roc_fig_cnn.json')
+lp_fig_cnn = pio.read_json('../Model_results/lp_fig_cnn.json')
+
+cm_fig_bilstm = pio.read_json('../Model_results/cm_fig_bilstm.json')
+roc_fig_bilstm = pio.read_json('../Model_results/roc_fig_bilstm.json')
+lp_fig_bilstm = pio.read_json('../Model_results/lp_fig_bilstm.json')
 
 app.layout = dbc.Container([
     dcc.Tabs([
@@ -63,6 +77,7 @@ app.layout = dbc.Container([
             dbc.Container([
                 dbc.Row([
                     dbc.Col([
+                        html.Br(),
                         dcc.Input(id='user-input', type='text', placeholder='Type a review...'),
                         html.Button('Predict', id='predict-button', n_clicks=0),
                         html.Div(id='prediction-result'),
@@ -82,6 +97,26 @@ app.layout = dbc.Container([
                                 'height': 'auto',
                             },
                         )
+                    ])
+                ])
+            ])
+        ]),
+        dcc.Tab(label='Model Performance', children=[
+            dbc.Container([
+                dbc.Row([
+                    dbc.Col([
+                        dcc.RadioItems(
+                            id='model-select',
+                            options=[
+                                {'label': 'RNN', 'value': 'rnn'},
+                                {'label': 'CNN', 'value': 'cnn'},
+                                {'label': 'Bi-LSTM', 'value': 'bilstm'}
+                            ],
+                            value='rnn'
+                        ),
+                        dcc.Graph(id='cm', config={'displayModeBar': False}),
+                        dcc.Graph(id='roc', config={'displayModeBar': False}),
+                        dcc.Graph(id='lp', config={'displayModeBar': False})
                     ])
                 ])
             ])
@@ -169,6 +204,20 @@ def update_output(n_clicks, value):
         return response, table_data
     else:
         return dash.no_update, dash.no_update
+
+@app.callback(
+    [Output('cm', 'figure'),
+     Output('roc', 'figure'),
+     Output('lp', 'figure')],
+    [Input('model-select', 'value')]
+)
+def update_performance_plots(selected_model):
+    if selected_model == 'rnn':
+        return cm_fig_rnn, roc_fig_rnn, lp_fig_rnn
+    elif selected_model == 'cnn':
+        return cm_fig_cnn, roc_fig_cnn, lp_fig_cnn
+    elif selected_model == 'bilstm':
+        return cm_fig_bilstm, roc_fig_bilstm, lp_fig_bilstm
 
 if __name__ == '__main__':
     app.run_server(debug=True)
