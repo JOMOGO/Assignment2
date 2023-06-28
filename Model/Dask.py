@@ -1,3 +1,4 @@
+import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 from dask_ml.feature_extraction.text import HashingVectorizer
@@ -56,15 +57,11 @@ def plot_roc_auc(y_true, y_pred, model_name):
 
     return fig
 
-def plot_loss_progression(history, model_name):
-    trace0 = go.Scatter(x=history.epoch, y=history.history['loss'], mode='lines', name='train')
-    trace1 = go.Scatter(x=history.epoch, y=history.history['val_loss'], mode='lines', name='test')
+def map_select_review(df):
+    return df.apply(select_review, axis=1)
 
-    layout = go.Layout(title='Loss progression for ' + model_name)
-
-    fig = go.Figure(data=[trace0, trace1], layout=layout)
-
-    return fig
+def map_sentiment(df):
+    return df['Reviewer_Score'].apply(lambda x: 'positive' if x > 6 else ('negative' if x < 4 else np.nan))
 
 if __name__ == '__main__':
     client = Client()
@@ -75,17 +72,24 @@ if __name__ == '__main__':
         df['Positive_Review'] = df['Positive_Review'].astype(str)
         df['Negative_Review'] = df['Negative_Review'].astype(str)
 
-        df['Review'] = df.apply(select_review, axis=1)
-        df = df.dropna(subset=['Review'])
+        # convert pandas DataFrame to Dask DataFrame
+        ddf = dd.from_pandas(df, npartitions=2)
 
-        df['Sentiment'] = df['Reviewer_Score'].apply(lambda x: 'positive' if x > 6 else ('negative' if x < 4 else np.nan))
-        df = df.dropna(subset=['Sentiment'])
+        ddf['Review'] = ddf.map_partitions(map_select_review, meta=('Review', 'object')).compute()
+        ddf = ddf.dropna(subset=['Review'])
 
-        X = df['Review']
-        y = df['Sentiment']
+        ddf['Sentiment'] = ddf.map_partitions(map_sentiment, meta=('Sentiment', 'object')).compute()
+        ddf = ddf.dropna(subset=['Sentiment'])
 
-        X = X.astype(str).tolist()
-        y = y.tolist()
+        # Scatter the data
+        future_ddf = client.scatter(ddf)
+
+        X = ddf['Review']
+        y = ddf['Sentiment']
+
+        # Convert X and y to pandas Series by calling .compute(), then convert to list
+        X = X.compute().tolist()
+        y = y.compute().tolist()
 
         tokenizer = Tokenizer(num_words=2000)
         tokenizer.fit_on_texts(X)
@@ -93,7 +97,9 @@ if __name__ == '__main__':
 
         ros = RandomOverSampler(random_state=42)
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        # Splitting data into training and testing using Dask
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
+
 
         X_train_seq = pad_sequences(tokenizer.texts_to_sequences(X_train), maxlen=300)
         X_test_seq = pad_sequences(tokenizer.texts_to_sequences(X_test), maxlen=300)
