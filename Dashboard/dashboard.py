@@ -27,22 +27,19 @@ rnn_model = load_model('../Model_results/rnn_model.h5')
 cnn_model = load_model('../Model_results/cnn_model.h5')
 bilstm_model = load_model('../Model_results/bilstm_model.h5')
 
-# Load tokenizer and vectorizer
+# Load tokenizer
 tokenizer = joblib.load('../Model_results/tokenizer.pkl')
-vectorizer = joblib.load('../Model_results/vectorizer.pkl')
 
 # Load plots
 cm_fig_rnn = pio.read_json('../Model_results/cm_fig_rnn.json')
 roc_fig_rnn = pio.read_json('../Model_results/roc_fig_rnn.json')
-lp_fig_rnn = pio.read_json('../Model_results/lp_fig_rnn.json')
 
 cm_fig_cnn = pio.read_json('../Model_results/cm_fig_cnn.json')
 roc_fig_cnn = pio.read_json('../Model_results/roc_fig_cnn.json')
-lp_fig_cnn = pio.read_json('../Model_results/lp_fig_cnn.json')
 
 cm_fig_bilstm = pio.read_json('../Model_results/cm_fig_bilstm.json')
 roc_fig_bilstm = pio.read_json('../Model_results/roc_fig_bilstm.json')
-lp_fig_bilstm = pio.read_json('../Model_results/lp_fig_bilstm.json')
+
 
 app.layout = dbc.Container([
     dcc.Tabs([
@@ -81,7 +78,7 @@ app.layout = dbc.Container([
                         dcc.Input(id='user-input', type='text', placeholder='Type a review...'),
                         html.Button('Predict', id='predict-button', n_clicks=0),
                         html.Div(id='prediction-result'),
-                        html.Br(),  # To add space
+                        html.Br(),
                         html.Label("Model Predictions:"),
                         dash_table.DataTable(
                             id='table',
@@ -116,7 +113,6 @@ app.layout = dbc.Container([
                         ),
                         dcc.Graph(id='cm', config={'displayModeBar': False}),
                         dcc.Graph(id='roc', config={'displayModeBar': False}),
-                        dcc.Graph(id='lp', config={'displayModeBar': False})
                     ])
                 ])
             ])
@@ -207,17 +203,16 @@ def update_output(n_clicks, value):
 
 @app.callback(
     [Output('cm', 'figure'),
-     Output('roc', 'figure'),
-     Output('lp', 'figure')],
+     Output('roc', 'figure')],
     [Input('model-select', 'value')]
 )
 def update_performance_plots(selected_model):
     if selected_model == 'rnn':
-        return cm_fig_rnn, roc_fig_rnn, lp_fig_rnn
+        return cm_fig_rnn, roc_fig_rnn
     elif selected_model == 'cnn':
-        return cm_fig_cnn, roc_fig_cnn, lp_fig_cnn
+        return cm_fig_cnn, roc_fig_cnn
     elif selected_model == 'bilstm':
-        return cm_fig_bilstm, roc_fig_bilstm, lp_fig_bilstm
+        return cm_fig_bilstm, roc_fig_bilstm
 
 if __name__ == '__main__':
     app.run_server(debug=True)

@@ -105,7 +105,6 @@ if __name__ == '__main__':
 
         vectorizer = HashingVectorizer(stop_words=stopwords.words('english'))
         X_train_transformed = vectorizer.fit_transform(X_resampled)
-        joblib.dump(vectorizer, '../Model_results/vectorizer.pkl')
         X_test_transformed = vectorizer.transform(X_test)
 
         le = LabelEncoder()
@@ -186,28 +185,22 @@ if __name__ == '__main__':
         # Plot and export figures
         cm_fig_rnn = plot_confusion_matrix(y_test_cat, rnn_preds, ['positive', 'negative'])
         roc_fig_rnn = plot_roc_auc(y_test_cat, rnn_preds, 'RNN')
-        lp_fig_rnn = plot_loss_progression(history_rnn, 'RNN')
 
         cm_fig_cnn = plot_confusion_matrix(y_test_cat, cnn_preds, ['positive', 'negative'])
         roc_fig_cnn = plot_roc_auc(y_test_cat, cnn_preds, 'CNN')
-        lp_fig_cnn = plot_loss_progression(history_cnn, 'CNN')
 
         cm_fig_bilstm = plot_confusion_matrix(y_test_cat, bilstm_preds, ['positive', 'negative'])
         roc_fig_bilstm = plot_roc_auc(y_test_cat, bilstm_preds, 'Bi-LSTM')
-        lp_fig_bilstm = plot_loss_progression(history_bilstm, 'Bi-LSTM')
 
         # Save the figures as .json
         pio.write_json(cm_fig_rnn, '../Model_results/cm_fig_rnn.json')
         pio.write_json(roc_fig_rnn, '../Model_results/roc_fig_rnn.json')
-        pio.write_json(lp_fig_rnn, '../Model_results/lp_fig_rnn.json')
 
         pio.write_json(cm_fig_cnn, '../Model_results/cm_fig_cnn.json')
         pio.write_json(roc_fig_cnn, '../Model_results/roc_fig_cnn.json')
-        pio.write_json(lp_fig_cnn, '../Model_results/lp_fig_cnn.json')
 
         pio.write_json(cm_fig_bilstm, '../Model_results/cm_fig_bilstm.json')
         pio.write_json(roc_fig_bilstm, '../Model_results/roc_fig_bilstm.json')
-        pio.write_json(lp_fig_bilstm, '../Model_results/lp_fig_bilstm.json')
 
         client.close()
     finally:
