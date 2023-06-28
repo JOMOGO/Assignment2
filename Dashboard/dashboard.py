@@ -9,6 +9,7 @@ import numpy as np
 import joblib
 from Database.db_connector import load_data_from_mongodb
 import plotly.io as pio
+import re
 
 df, collection= load_data_from_mongodb()
 
@@ -161,8 +162,11 @@ def update_plots(clickData):
 )
 def update_output(n_clicks, value):
     if n_clicks > 0:
-        # Tokenize and pad user input
-        sequences = tokenizer.texts_to_sequences([value])
+        # Preprocess user input
+        processed_input = re.sub(r'\b(not|no|never|don\'t)\s+(\w+)\b', r'\1_\2', value)
+
+        # Tokenize and pad preprocessed user input
+        sequences = tokenizer.texts_to_sequences([processed_input])
         data = pad_sequences(sequences, maxlen=MAX_LEN)
 
         # Make predictions
