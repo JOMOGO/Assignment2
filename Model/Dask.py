@@ -19,7 +19,6 @@ import plotly.figure_factory as ff
 import plotly.graph_objs as go
 import plotly.io as pio
 import re
-import random
 
 def select_review(row):
     if row['Reviewer_Score'] > 7 and row['Positive_Review'] != '':
@@ -43,10 +42,9 @@ def print_confusion_matrix(y_true, y_pred):
     specificity = matrix[1, 1] / (matrix[1, 1] + matrix[0, 1])
     print('Specificity (True Negative Rate): ', specificity)
 
-
 def plot_confusion_matrix(y_true, y_pred, labels):
     matrix = confusion_matrix(y_true.argmax(axis=1), y_pred.argmax(axis=1))
-    x = labels[::-1]
+    x = labels
     y = labels
     fig = ff.create_annotated_heatmap(matrix, x=x, y=y, colorscale='Viridis')
     fig.update_layout(
@@ -68,7 +66,6 @@ def plot_roc_auc(y_true, y_pred, model_name):
                        yaxis=dict(title='True Positive Rate'))
 
     fig = go.Figure(data=[trace0, trace1], layout=layout)
-
     return fig
 
 def select_review(row):
@@ -81,6 +78,24 @@ def map_sentiment(df):
 
 def map_select_review(df):
     return df.apply(select_review, axis=1)
+
+def train_model(X_train_seq, y_train_cat, model_type):
+    model = Sequential()
+    model.add(Embedding(2000, 50, input_length=300))
+    if model_type == 'RNN':
+        model.add(LSTM(25, dropout=0.2, recurrent_dropout=0.2))
+        model.add(Dense(2, activation='sigmoid'))
+    elif model_type == 'CNN':
+        model.add(Conv1D(128, 5, activation='relu'))
+        model.add(GlobalMaxPooling1D())
+        model.add(Dense(2, activation='sigmoid'))
+    elif model_type == 'Bi-LSTM':
+        model.add(Bidirectional(LSTM(25, dropout=0.2, recurrent_dropout=0.2)))
+        model.add(Dense(2, activation='sigmoid'))
+
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    history = model.fit(X_train_seq, y_train_cat, validation_split=0.2, epochs=1)
+    return model, history
 
 
 if __name__ == '__main__':
@@ -138,7 +153,6 @@ if __name__ == '__main__':
         # Splitting data into training and testing using Dask
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
-
         X_train_seq = pad_sequences(tokenizer.texts_to_sequences(X_train), maxlen=300)
         X_test_seq = pad_sequences(tokenizer.texts_to_sequences(X_test), maxlen=300)
 
@@ -159,71 +173,12 @@ if __name__ == '__main__':
         y_train_cat = to_categorical(y_train_encoded)
         y_test_cat = to_categorical(y_test_encoded)
 
-        # Define RNN model
-        model_rnn = Sequential()
-        model_rnn.add(Embedding(2000, 50, input_length=300))
-        model_rnn.add(LSTM(25, dropout=0.2, recurrent_dropout=0.2))
-        model_rnn.add(Dense(2, activation='sigmoid'))
+        model_rnn, history_rnn = train_model(X_train_seq, y_train_cat, 'RNN')
+        model_cnn, history_cnn = train_model(X_train_seq, y_train_cat, 'CNN')
+        model_bilstm, history_bilstm = train_model(X_train_seq, y_train_cat, 'Bi-LSTM')
 
-        # Compile the model
-        model_rnn.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-
-        # Fit the model
-        history_rnn = model_rnn.fit(X_train_seq, y_train_cat, validation_split=0.2, epochs=1)
-
-        # Save the RNN model
-        model_rnn.save('../Model_results/rnn_model.h5')
-
-        # Evaluate the RNN model
-        scores = model_rnn.evaluate(X_test_seq, y_test_cat)
-        print("RNN Accuracy: ", scores[1])
-
-        # Predict the results
         rnn_preds = model_rnn.predict(X_test_seq)
-
-        # Define CNN model
-        model_cnn = Sequential()
-        model_cnn.add(Embedding(2000, 50, input_length=300))
-        model_cnn.add(Conv1D(128, 5, activation='relu'))
-        model_cnn.add(GlobalMaxPooling1D())
-        model_cnn.add(Dense(2, activation='sigmoid'))
-
-        # Compile the model
-        model_cnn.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-
-        # Fit the model
-        history_cnn = model_cnn.fit(X_train_seq, y_train_cat, validation_split=0.2, epochs=1)
-
-        # Save the CNN model
-        model_cnn.save('../Model_results/cnn_model.h5')
-
-        # Evaluate the CNN model
-        scores = model_cnn.evaluate(X_test_seq, y_test_cat)
-        print("CNN Accuracy: ", scores[1])
-
-        # Predict the results
         cnn_preds = model_cnn.predict(X_test_seq)
-
-        # Define Bi-LSTM model
-        model_bilstm = Sequential()
-        model_bilstm.add(Embedding(2000, 50, input_length=300))
-        model_bilstm.add(Bidirectional(LSTM(25, dropout=0.2, recurrent_dropout=0.2)))
-        model_bilstm.add(Dense(2, activation='sigmoid'))
-
-        # Compile the model
-        model_bilstm.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-
-        # Fit the model
-        history_bilstm = model_bilstm.fit(X_train_seq, y_train_cat, validation_split=0.2, epochs=1)
-
-        # Save the Bi-LSTM model
-        model_bilstm.save('../Model_results/bilstm_model.h5')
-
-        # Evaluate the Bi-LSTM model
-        scores = model_bilstm.evaluate(X_test_seq, y_test_cat)
-        print("Bi-LSTM Accuracy: ", scores[1])
-
-        # Predict the results
         bilstm_preds = model_bilstm.predict(X_test_seq)
 
         # Plot and export figures
