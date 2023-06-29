@@ -163,8 +163,8 @@ def update_plots(clickData):
 def update_output(n_clicks, value):
     if n_clicks > 0:
         # Preprocess user input
-        processed_input = re.sub(r'\b(not|no|never|don\'t)\s+(\w+)\b', r'\1_\2', value)
-
+        processed_input = re.sub(
+            r'\b(not|no|never|neither|nothing|none|no one|nobody|nowhere|neither|nor|barely|hardly|scarcely|seldom|rarely)\s+(\w+)\b',r'\1_\2', value)
         # Tokenize and pad preprocessed user input
         sequences = tokenizer.texts_to_sequences([processed_input])
         data = pad_sequences(sequences, maxlen=MAX_LEN)

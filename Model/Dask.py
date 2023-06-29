@@ -21,12 +21,27 @@ import plotly.io as pio
 import re
 
 def select_review(row):
-    if row['Reviewer_Score'] > 6:
+    if row['Reviewer_Score'] > 7:
         return row['Positive_Review']
-    elif row['Reviewer_Score'] < 4:
+    elif row['Reviewer_Score'] < 5:
         return row['Negative_Review']
     else:
         return np.nan
+
+def print_confusion_matrix(y_true, y_pred):
+    matrix = confusion_matrix(y_true.argmax(axis=1), y_pred.argmax(axis=1))
+    print('Confusion Matrix : \n', matrix)
+    total = sum(sum(matrix))
+
+    accuracy = (matrix[0, 0] + matrix[1, 1]) / total
+    print ('Accuracy : ', accuracy)
+
+    sensitivity = matrix[0, 0] / (matrix[0, 0] + matrix[1, 0])
+    print('Sensitivity (True Positive Rate): ', sensitivity)
+
+    specificity = matrix[1, 1] / (matrix[1, 1] + matrix[0, 1])
+    print('Specificity (True Negative Rate): ', specificity)
+
 
 def plot_confusion_matrix(y_true, y_pred, labels):
     matrix = confusion_matrix(y_true.argmax(axis=1), y_pred.argmax(axis=1))
@@ -61,11 +76,15 @@ def plot_roc_auc(y_true, y_pred, model_name):
 
 def select_review(row):
     text = row['Positive_Review'] if row['Reviewer_Score'] > 6 else row['Negative_Review']
-    processed_text = re.sub(r'\b(not|no|never|don\'t)\s+(\w+)\b', r'\1_\2', text)  # Add a prefix 'not_' to the word after negation terms
+    processed_text = re.sub(r'\b(not|no|never|neither|nothing|none|no one|nobody|nowhere|neither/nor|barely|hardly|scarcely|seldom|rarely)\s+(\w+)\b', r'\1_\2', text)
     return processed_text
 
 def map_sentiment(df):
     return df['Reviewer_Score'].apply(lambda x: 'positive' if x > 6 else ('negative' if x < 4 else np.nan))
+
+def map_select_review(df):
+    return df.apply(select_review, axis=1)
+
 
 if __name__ == '__main__':
     client = Client()
@@ -211,6 +230,15 @@ if __name__ == '__main__':
 
         pio.write_json(cm_fig_bilstm, '../Model_results/cm_fig_bilstm.json')
         pio.write_json(roc_fig_bilstm, '../Model_results/roc_fig_bilstm.json')
+
+        print("RNN Model Confusion Matrix")
+        print_confusion_matrix(y_test_cat, rnn_preds)
+
+        print("CNN Model Confusion Matrix")
+        print_confusion_matrix(y_test_cat, cnn_preds)
+
+        print("Bi-LSTM Model Confusion Matrix")
+        print_confusion_matrix(y_test_cat, bilstm_preds)
 
         client.close()
     finally:
