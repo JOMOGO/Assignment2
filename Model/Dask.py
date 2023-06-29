@@ -246,15 +246,6 @@ if __name__ == '__main__':
         pio.write_json(cm_fig_bilstm, '../Model_results/cm_fig_bilstm.json')
         pio.write_json(roc_fig_bilstm, '../Model_results/roc_fig_bilstm.json')
 
-        print("RNN Model Confusion Matrix")
-        print_confusion_matrix(y_test_cat, rnn_preds)
-
-        print("CNN Model Confusion Matrix")
-        print_confusion_matrix(y_test_cat, cnn_preds)
-
-        print("Bi-LSTM Model Confusion Matrix")
-        print_confusion_matrix(y_test_cat, bilstm_preds)
-
         client.close()
     finally:
         client.close()

@@ -104,14 +104,13 @@ app.layout = dbc.Container([
                 dbc.Row([
                     dbc.Col([
                         html.Br(),
-                        dcc.RadioItems(
-                            id='model-select',
-                            options=[
-                                {'label': 'RNN', 'value': 'rnn'},
-                                {'label': 'CNN', 'value': 'cnn'},
-                                {'label': 'Bi-LSTM', 'value': 'bilstm'}
+                        dbc.ButtonGroup(
+                            [
+                                dbc.Button("RNN", id="btn-rnn", color="success", className="mr-1"),
+                                dbc.Button("CNN", id="btn-cnn", color="primary", className="mr-1"),
+                                dbc.Button("Bi-LSTM", id="btn-bilstm", color="primary", className="mr-1"),
                             ],
-                            value='rnn'
+                            className="mb-3",
                         ),
                         dcc.Graph(id='cm', config={'displayModeBar': False}),
                         dcc.Graph(id='roc', config={'displayModeBar': False}),
@@ -208,16 +207,30 @@ def update_output(n_clicks, value):
 
 @app.callback(
     [Output('cm', 'figure'),
-     Output('roc', 'figure')],
-    [Input('model-select', 'value')]
+     Output('roc', 'figure'),
+     Output('btn-rnn', 'color'),
+     Output('btn-cnn', 'color'),
+     Output('btn-bilstm', 'color')],
+    [Input('btn-rnn', 'n_clicks'),
+     Input('btn-cnn', 'n_clicks'),
+     Input('btn-bilstm', 'n_clicks')]
 )
-def update_performance_plots(selected_model):
-    if selected_model == 'rnn':
-        return cm_fig_rnn, roc_fig_rnn
-    elif selected_model == 'cnn':
-        return cm_fig_cnn, roc_fig_cnn
-    elif selected_model == 'bilstm':
-        return cm_fig_bilstm, roc_fig_bilstm
+def update_performance_plots(n_clicks_rnn, n_clicks_cnn, n_clicks_bilstm):
+    ctx = dash.callback_context
+
+    if not ctx.triggered:
+        return cm_fig_rnn, roc_fig_rnn, 'success', 'primary', 'primary'  # RNN selected by default
+    else:
+        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    if button_id == 'btn-rnn':
+        return cm_fig_rnn, roc_fig_rnn, 'success', 'primary', 'primary'
+    elif button_id == 'btn-cnn':
+        return cm_fig_cnn, roc_fig_cnn, 'primary', 'success', 'primary'
+    elif button_id == 'btn-bilstm':
+        return cm_fig_bilstm, roc_fig_bilstm, 'primary', 'primary', 'success'
+
+
 
 if __name__ == '__main__':
     app.run_server(debug=True)
