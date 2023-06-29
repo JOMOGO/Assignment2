@@ -19,11 +19,12 @@ import plotly.figure_factory as ff
 import plotly.graph_objs as go
 import plotly.io as pio
 import re
+import random
 
 def select_review(row):
-    if row['Reviewer_Score'] > 7:
+    if row['Reviewer_Score'] > 7 and row['Positive_Review'] != '':
         return row['Positive_Review']
-    elif row['Reviewer_Score'] < 5:
+    elif row['Reviewer_Score'] < 5 and row['Negative_Review'] != '':
         return row['Negative_Review']
     else:
         return np.nan
@@ -45,19 +46,15 @@ def print_confusion_matrix(y_true, y_pred):
 
 def plot_confusion_matrix(y_true, y_pred, labels):
     matrix = confusion_matrix(y_true.argmax(axis=1), y_pred.argmax(axis=1))
-    x = labels
-    y = labels[::-1]
-
+    x = labels[::-1]
+    y = labels
     fig = ff.create_annotated_heatmap(matrix, x=x, y=y, colorscale='Viridis')
-
     fig.update_layout(
         title_text='Confusion Matrix',
         xaxis=dict(title='Predicted Label'),
         yaxis=dict(title='True Label')
     )
-
     return fig
-
 
 def plot_roc_auc(y_true, y_pred, model_name):
     fpr, tpr, _ = roc_curve(y_true.ravel(), y_pred.ravel())
@@ -75,12 +72,12 @@ def plot_roc_auc(y_true, y_pred, model_name):
     return fig
 
 def select_review(row):
-    text = row['Positive_Review'] if row['Reviewer_Score'] > 6 else row['Negative_Review']
-    processed_text = re.sub(r'\b(not|no|never|neither|nothing|none|no one|nobody|nowhere|neither/nor|barely|hardly|scarcely|seldom|rarely)\s+(\w+)\b', r'\1_\2', text)
+    text = row['Positive_Review'] if row['Reviewer_Score'] > 7 else row['Negative_Review']
+    processed_text = re.sub(r'\b(not|no|never|neither|nothing|none|no one|nobody|nowhere|nor|barely|hardly|scarcely|seldom|rarely)\s+(\w+)\b', r'\1_\2', text)
     return processed_text
 
 def map_sentiment(df):
-    return df['Reviewer_Score'].apply(lambda x: 'positive' if x > 6 else ('negative' if x < 4 else np.nan))
+    return df['Reviewer_Score'].apply(lambda x: 'positive' if x > 7 else ('negative' if x < 5 else np.nan))
 
 def map_select_review(df):
     return df.apply(select_review, axis=1)
@@ -104,11 +101,29 @@ if __name__ == '__main__':
         ddf['Sentiment'] = ddf.map_partitions(map_sentiment, meta=('Sentiment', 'object')).compute()
         ddf = ddf.dropna(subset=['Sentiment'])
 
-        # Scatter the data
-        future_ddf = client.scatter(ddf)
+        # Drop NaN values from 'Review' and 'Sentiment' columns
+        ddf = ddf.dropna(subset=['Review', 'Sentiment'])
 
-        X = ddf['Review']
-        y = ddf['Sentiment']
+        # Count the occurrences of positive and negative reviews
+        positive_count = (ddf['Sentiment'] == 'positive').sum().compute()
+        negative_count = (ddf['Sentiment'] == 'negative').sum().compute()
+
+        # Determine the minimum count between positive and negative reviews
+        min_count = min(positive_count, negative_count)
+
+        # Sample the minimum count of positive and negative reviews
+        positive_reviews = ddf[ddf['Sentiment'] == 'positive'].sample(frac=min_count / positive_count, random_state=42)
+        negative_reviews = ddf[ddf['Sentiment'] == 'negative'].sample(frac=min_count / negative_count, random_state=42)
+
+        # Concatenate the positive and negative reviews
+        balanced_df = dd.concat([positive_reviews, negative_reviews])
+
+        # Shuffle the rows in the balanced dataset
+        balanced_df = balanced_df.sample(frac=1, random_state=42).reset_index(drop=True)
+
+        # Use the balanced dataset for training and testing
+        X = balanced_df['Review']
+        y = balanced_df['Sentiment']
 
         # Convert X and y to pandas Series by calling .compute(), then convert to list
         X = X.compute().tolist()

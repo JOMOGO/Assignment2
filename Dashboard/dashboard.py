@@ -103,6 +103,7 @@ app.layout = dbc.Container([
             dbc.Container([
                 dbc.Row([
                     dbc.Col([
+                        html.Br(),
                         dcc.RadioItems(
                             id='model-select',
                             options=[
@@ -143,7 +144,7 @@ def update_plots(clickData):
             Box(
                 y=filtered_df["Reviewer_Score"],
                 name=f'Reviewer Score Distribution for {nationality}',
-                boxpoints=False  # do not show individual points
+                boxpoints=False
             )
         ]
     }
@@ -164,7 +165,7 @@ def update_output(n_clicks, value):
     if n_clicks > 0:
         # Preprocess user input
         processed_input = re.sub(
-            r'\b(not|no|never|neither|nothing|none|no one|nobody|nowhere|neither|nor|barely|hardly|scarcely|seldom|rarely)\s+(\w+)\b',r'\1_\2', value)
+            r'\b(not|no|never|neither|nothing|none|no one|nobody|nowhere|nor|barely|hardly|scarcely|seldom|rarely)\s+(\w+)\b',r'\1_\2', value)
         # Tokenize and pad preprocessed user input
         sequences = tokenizer.texts_to_sequences([processed_input])
         data = pad_sequences(sequences, maxlen=MAX_LEN)
