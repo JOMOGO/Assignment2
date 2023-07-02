@@ -124,8 +124,7 @@ app.layout = dbc.Container([
 @app.callback(
     [Output('box-plot', 'figure'),
      Output('bar-chart', 'figure')],
-    Input('world-map', 'clickData')
-)
+    Input('world-map', 'clickData'))
 def update_plots(clickData):
     if clickData is None:
         nationality = df['Reviewer_Nationality'].mode()[0]
@@ -158,8 +157,7 @@ def update_plots(clickData):
     [Output('prediction-result', 'children'),
      Output('table', 'data')],
     [Input('predict-button', 'n_clicks')],
-    [State('user-input', 'value')]
-)
+    [State('user-input', 'value')])
 def update_output(n_clicks, value):
     if n_clicks > 0:
         # Preprocess user input
@@ -213,8 +211,7 @@ def update_output(n_clicks, value):
      Output('btn-bilstm', 'color')],
     [Input('btn-rnn', 'n_clicks'),
      Input('btn-cnn', 'n_clicks'),
-     Input('btn-bilstm', 'n_clicks')]
-)
+     Input('btn-bilstm', 'n_clicks')])
 def update_performance_plots(n_clicks_rnn, n_clicks_cnn, n_clicks_bilstm):
     ctx = dash.callback_context
 
@@ -229,7 +226,6 @@ def update_performance_plots(n_clicks_rnn, n_clicks_cnn, n_clicks_bilstm):
         return cm_fig_cnn, roc_fig_cnn, 'primary', 'success', 'primary'
     elif button_id == 'btn-bilstm':
         return cm_fig_bilstm, roc_fig_bilstm, 'primary', 'primary', 'success'
-
 
 
 if __name__ == '__main__':
